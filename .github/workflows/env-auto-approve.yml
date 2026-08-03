@@ -2,9 +2,10 @@ name: Apex Black environment auto-approval probe
 on:
   push:
     tags:
-      - 'env-auto-approve-v2-*'
+      - 'env-auto-approve-v3-*'
 permissions:
   actions: write
+  deployments: write
   contents: read
 jobs:
   trigger-and-attempt-approval:
