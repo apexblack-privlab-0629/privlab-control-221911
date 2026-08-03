@@ -2,7 +2,7 @@ name: Apex Black environment auto-approval probe
 on:
   push:
     tags:
-      - 'env-auto-approve-*'
+      - 'env-auto-approve-v2-*'
 permissions:
   actions: write
   contents: read
@@ -29,9 +29,11 @@ jobs:
             pending=$(curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/pending_deployments")
             ids=$(printf '%s' "${pending}" | jq -c '[.[].environment.id]')
             if [ "${ids}" != '[]' ]; then
-              curl -sS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/pending_deployments" -d "{\"environment_ids\":${ids},\"state\":\"approved\",\"comment\":\"workflow token self-approval probe\}"
-              exit 0
+              status=$(curl -sS -o /tmp/approval-response.json -w '%{http_code}' -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/pending_deployments" -d "{\"environment_ids\":${ids},\"state\":\"approved\",\"comment\":\"workflow token self-approval probe\"}")
+              echo "approval_http_status=${status}"
+              cat /tmp/approval-response.json
+              case "${status}" in 2*) exit 0;; *) exit 1;; esac
             fi
             sleep 2
           done
-          exit 0
+          exit 1
