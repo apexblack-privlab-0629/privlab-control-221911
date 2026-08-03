@@ -1,0 +1,13 @@
+name: Apex Black environment gated finalizer
+on:
+  workflow_dispatch:
+permissions:
+  actions: write
+  deployments: write
+  contents: read
+jobs:
+  gated-finalizer:
+    runs-on: ubuntu-latest
+    environment: production-gate
+    steps:
+      - run: printf 'workflow-token-environment-finalizer-sentinel\n'

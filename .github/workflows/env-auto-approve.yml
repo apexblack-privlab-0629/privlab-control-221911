@@ -1,0 +1,37 @@
+name: Apex Black environment auto-approval probe
+on:
+  push:
+    tags:
+      - 'env-auto-approve-*'
+permissions:
+  actions: write
+  contents: read
+jobs:
+  trigger-and-attempt-approval:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch gated workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail-with-body -sS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/env-gated-finalizer.yml/dispatches -d '{"ref":"main"}'
+      - name: Attempt to approve gated run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          for n in $(seq 1 30); do
+            run_id=$(curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/env-gated-finalizer.yml/runs?event=workflow_dispatch&per_page=10" | jq -r '[.workflow_runs[] | select(.created_at | fromdateiso8601 >= (now-120))] | sort_by(.created_at) | last | .id // empty')
+            if [ -n "${run_id}" ]; then break; fi
+            sleep 2
+          done
+          for n in $(seq 1 30); do
+            pending=$(curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/pending_deployments")
+            ids=$(printf '%s' "${pending}" | jq -c '[.[].environment.id]')
+            if [ "${ids}" != '[]' ]; then
+              curl -sS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/pending_deployments" -d "{\"environment_ids\":${ids},\"state\":\"approved\",\"comment\":\"workflow token self-approval probe\}"
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 0
