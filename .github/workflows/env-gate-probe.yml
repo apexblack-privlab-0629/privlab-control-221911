@@ -1,0 +1,14 @@
+name: Apex Black environment gate probe
+on:
+  push:
+    tags:
+      - 'env-gate-probe-*'
+permissions:
+  contents: read
+  deployments: write
+jobs:
+  gated-deploy:
+    runs-on: ubuntu-latest
+    environment: production-gate
+    steps:
+      - run: printf 'environment-gate-sentinel\n'
